@@ -1,10 +1,8 @@
 const express = require("express");
-
+const { Client } = require("pg");
 const cors = require("cors");
 const bodyparser = require("body-parser");
 const config = require("./config");
-
-const mysql_connector = require("mysql");
 
 const app = express();
 
@@ -12,12 +10,20 @@ app.use(express.json());
 app.use(cors());
 app.use(bodyparser.json());
 
-const connection = mysql_connector.createConnection({
-  host: config.host,
-  user: config.user,
-  password: config.password,
-  database: config.database,
-  port: config.port_mysql,
+var conString = config.urlConnection;
+
+var client = new Client(conString);
+
+client.connect(function (err) {
+  if (err) {
+    return console.error("Não foi possível conectar ao banco.", err);
+  }
+  client.query("SELECT NOW()", function (err, result) {
+    if (err) {
+      return console.error("Erro ao executar a query.", err);
+    }
+    console.log(result.rows[0]);
+  });
 });
 
 app.get("/", (req, res) => {
@@ -25,60 +31,106 @@ app.get("/", (req, res) => {
   res.send("Ok");
 });
 
-app.get("/allUsers", (req, res) => {
+app.get("/usuarios", (req, res) => {
   try {
-    connection.query("select * from Usuarios", function (error, results) {
-      console.log("query response is ", results);
-      res.json(results);
+    client.query("SELECT * FROM Usuarios", function (err, result) {
+      if (err) {
+        return console.error("Erro ao executar a qry de SELECT", err);
+      }
+      res.send(result.rows);
+      console.log("Chamou get usuarios");
     });
+  } catch (error)  {
+    console.log(error);
+  }
+});
+
+app.get("/usuarios/:id", (req, res) => {
+  try {
+    console.log("Chamou /:id " + req.params.id);
+    client.query(
+      "SELECT * FROM Usuarios WHERE id = $1",
+      [req.params.id],
+      function (err, result) {
+        if (err) {
+          return console.error("Erro ao executar a qry de SELECT id", err);
+        }
+        res.send(result.rows);
+        console.log(result);
+      }
+    );
   } catch (error) {
     console.log(error);
   }
 });
 
-app.get("/:id", (req, res) => {
+app.delete("/usuarios/:id", (req, res) => {
   try {
-    connection.query("select * from Usuarios where id = ?", [req.params.id] , function (error, results) {
-      console.log("query response is ", results);
-      res.json(results);
-    });
+    console.log("Chamou delete /:id " + req.params.id);
+    const id = req.params.id;
+    client.query(
+      "DELETE FROM Usuarios WHERE id = $1",
+      [id],
+      function (err, result) {
+        if (err) {
+          return console.error("Erro ao executar a qry de DELETE", err);
+        } else {
+          if (result.rowCount == 0) {
+            res.status(400).json({ info: "Registro não encontrado." });
+          } else {
+            res.status(200).json({ info: `Registro excluído. Código: ${id}` });
+          }
+        }
+        console.log(result);
+      }
+    );
   } catch (error) {
     console.log(error);
   }
 });
 
-app.delete("/:id", (req, res) => {
+app.post("/usuarios", (req, res) => {
   try {
-    connection.query("delete from Usuarios where id = ?", [req.params.id] , function (error, results) {
-      console.log("query response is ", results);
-      res.json(results);
-    });
-  } catch (error) {
-    console.log(error);
+    console.log("Chamou post", req.body);
+    const { nome, email } = req.body;
+    client.query(
+      "INSERT INTO Usuarios (nome, email) VALUES ($1, $2) RETURNING * ",
+      [nome, email],
+      function (err, result) {
+        if (err) {
+          return console.error("Erro ao executar a qry de INSERT", err);
+        }
+        const { id } = result.rows[0];
+        res.setHeader("id", `${id}`);
+        res.status(201).json(result.rows[0]);
+        console.log(result);
+      }
+    );
+  } catch (erro) {
+    console.error(erro);
   }
 });
 
-app.post("/new", (req, res) => {
+app.put("/usuarios/:id", (req, res) => {
   try {
-    const params = req.body;
-    connection.query("insert into Usuarios set ?", params , function (error, results) {
-      console.log("query response is ", results);
-      res.json(results);
-    });
-  } catch (error) {
-    console.log(error);
-  }
-});
-
-app.put("/:id", (req, res) => {
-  try {
-    const {id, nome, email} = req.body;
-    connection.query("update Usuarios set name=?, email=? where id = ?", [nome, email, id], function (error, results) {
-      console.log("query response is ", results);
-      res.json(results);
-    });
-  } catch (error) {
-    console.log(error);
+    console.log("Chamou update", req.body);
+    const id = req.params.id;
+    const { nome, email } = req.body;
+    client.query(
+      "UPDATE Usuarios SET nome=$1, email=$2 WHERE id =$3 ",
+      [nome, email, id],
+      function (err, result) {
+        if (err) {
+          return console.error("Erro ao executar a qry de UPDATE", err);
+        } else {
+          res.setHeader("id", id);
+          res.status(202).json({ id: id });
+          console.log(result);
+        }
+      }
+    );
+  } catch (erro) {
+    console.error(erro);
   }
 });
 

@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start": "nodemon index.js",
-    "build": "netlify-lambda build express",
+    "build": "./node_modules/.bin/netlify-lambda build dist",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
@@ -14,9 +14,13 @@
     "nodemon": "^2.0.16"
   },
   "dependencies": {
+    "axios": "^0.27.2",
     "cors": "^2.8.5",
     "dotenv": "^16.0.1",
     "express": "^4.18.1",
-    "mysql": "^2.18.1"
+    "mysql": "^2.18.1",
+    "netlify-lambda": "^2.0.15",
+    "pg": "^8.7.3",
+    "serverless-http": "^3.0.1"
   }
 }
